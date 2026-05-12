@@ -258,8 +258,8 @@ async function postWeeklyLeaderboard() {
   summaryEmbed.addFields({
     name: "🌟 Best Post",
     value: bestPost
-      ? `${formatSummaryContent(bestPost)}
-${bestPost.authorId ? `<@${bestPost.authorId}>` : ""}
+      ? `${bestPost.authorId ? `<@${bestPost.authorId}>` : ""}
+${formatSummaryContent(bestPost)}
 ${summarizeReactions(bestPost.reactions)}
 [Jump to message](${bestPost.jumpUrl})`
       : "No data",
@@ -268,8 +268,8 @@ ${summarizeReactions(bestPost.reactions)}
   summaryEmbed.addFields({
     name: "💥 Worst Post",
     value: worstPost
-      ? `${formatSummaryContent(worstPost)}
-${worstPost.authorId ? `<@${worstPost.authorId}>` : ""}
+      ? `${worstPost.authorId ? `<@${worstPost.authorId}>` : ""}
+${formatSummaryContent(worstPost)}
 ${summarizeReactions(worstPost.reactions)}
 [Jump to message](${worstPost.jumpUrl})`
       : "No data",
