@@ -223,8 +223,12 @@ ${summarizeReactions(worstPost.reactions)}
   });
 
   await sendAuthorLeaderboard(thread, authorScores);
-  await sendPostLeaderboard(thread, "Top 10 Posts", topPosts);
-  await sendPostLeaderboard(thread, "Worst 3 Posts", worstPosts);
+  await sendPostLeaderboard(thread, `Top ${LEADERBOARD_LIMIT} Posts`, topPosts);
+  await sendPostLeaderboard(
+    thread,
+    `Worst ${WORST_POST_LIMIT} Posts`,
+    worstPosts,
+  );
 }
 
 function summarizeReactions(reactions) {
