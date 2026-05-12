@@ -6,7 +6,7 @@ This Discord bot monitors reactions in a specific channel, classifies them as po
 
 - Track reactions in a single target channel
 - Configure positive and negative reaction sets
-- Weekly leaderboard embed with score breakdown and jump links
+- Weekly leaderboard embed with top authors, score breakdown, and jump links
 - Persistent storage in `data/leaderboard.json`
 - Self-hostable with Docker
 

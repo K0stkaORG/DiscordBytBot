@@ -136,13 +136,34 @@ async function postWeeklyLeaderboard() {
     return;
   }
 
+  const authorScores = aggregateAuthorScores(
+    Object.values(data.messages).filter(
+      (entry) => entry.createdTimestamp >= oneWeekAgo,
+    ),
+  );
+
   const embed = new EmbedBuilder()
     .setTitle("Weekly Reaction Leaderboard")
     .setDescription(
-      `Top posts from the last 7 days in <#${TARGET_CHANNEL_ID}>.`,
+      `Top posts and authors from the last 7 days in <#${TARGET_CHANNEL_ID}>.`,
     )
     .setColor(0x5865f2)
     .setTimestamp(new Date());
+
+  if (authorScores.length > 0) {
+    const authorLines = authorScores
+      .slice(0, LEADERBOARD_LIMIT)
+      .map(
+        (entry, index) =>
+          `#${index + 1} • <@${entry.authorId}> — ${entry.score}`,
+      )
+      .join("\n");
+
+    embed.addFields({
+      name: "Top Authors",
+      value: authorLines,
+    });
+  }
 
   entries.forEach((entry, index) => {
     const breakdown = summarizeReactions(entry.reactions);
@@ -160,6 +181,19 @@ function summarizeReactions(reactions) {
   const positiveCount = sumBySet(reactions, POSITIVE_REACTIONS);
   const negativeCount = sumBySet(reactions, NEGATIVE_REACTIONS);
   return `Reactions: +${positiveCount} / -${negativeCount}`;
+}
+
+function aggregateAuthorScores(entries) {
+  const totals = new Map();
+
+  entries.forEach((entry) => {
+    if (!entry.authorId) return;
+    totals.set(entry.authorId, (totals.get(entry.authorId) || 0) + entry.score);
+  });
+
+  return Array.from(totals.entries())
+    .map(([authorId, score]) => ({ authorId, score }))
+    .sort((a, b) => b.score - a.score);
 }
 
 function sumBySet(reactions, set) {
