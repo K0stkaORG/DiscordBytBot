@@ -208,10 +208,6 @@ async function postWeeklyLeaderboard() {
   );
 
   if (weeklyEntries.length === 0) {
-    await summaryChannel.send({
-      content: "No scored posts in the last week.",
-      allowedMentions: ALLOWED_MENTIONS,
-    });
     return;
   }
 
