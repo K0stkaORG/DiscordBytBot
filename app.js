@@ -31,7 +31,6 @@ const LEADERBOARD_CRON = process.env.LEADERBOARD_CRON || "0 9 * * 1";
 const LEADERBOARD_LIMIT = Number(process.env.LEADERBOARD_LIMIT || 10);
 const WORST_POST_LIMIT = Number(process.env.WORST_POST_LIMIT || 3);
 const SUMMARY_TITLE = process.env.SUMMARY_TITLE || "🏆 Weekly Reaction Summary";
-const SUMMARY_DESCRIPTION = process.env.SUMMARY_DESCRIPTION || null;
 const THREAD_TITLE =
   process.env.THREAD_TITLE || "🎮 Weekly Leaderboard Details";
 const THREAD_AUTO_ARCHIVE_MINUTES = parseArchiveDuration(
@@ -233,13 +232,8 @@ async function postWeeklyLeaderboard() {
   const bestPost = topPosts[0] || null;
   const worstPost = worstPosts[0] || null;
 
-  const summaryDescription = SUMMARY_DESCRIPTION
-    ? SUMMARY_DESCRIPTION
-    : `Summary for the last 7 days across ${TARGET_CHANNEL_IDS.size} channels.`;
-
   const summaryEmbed = new EmbedBuilder()
     .setTitle(SUMMARY_TITLE)
-    .setDescription(summaryDescription)
     .setColor(0x00c2ff)
     .setTimestamp(new Date())
     .setFooter({ text: "GGs only — full stats in thread" });
