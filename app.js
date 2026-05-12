@@ -337,7 +337,7 @@ async function sendAuthorLeaderboard(channel, authorScores) {
   const lines = authorScores.map(
     (entry, index) => `#${index + 1} • <@${entry.authorId}> — ${entry.score}`,
   );
-  await sendChunkedEmbeds(channel, "🏅 Personal Leaderboard", lines);
+  await sendChunkedEmbeds(channel, "🏅 Personal Leaderboard", lines, 0xf1c40f);
 }
 
 async function sendPostLeaderboard(channel, title, entries) {
@@ -358,16 +358,19 @@ async function sendPostLeaderboard(channel, title, entries) {
     };
   });
 
-  await sendFieldEmbeds(channel, title, fields);
+  const embedColor = title.startsWith("🔥")
+    ? 0x2ecc71
+    : title.startsWith("💀")
+      ? 0xe74c3c
+      : 0x5865f2;
+
+  await sendFieldEmbeds(channel, title, fields, embedColor);
 }
 
-async function sendChunkedEmbeds(channel, title, lines) {
+async function sendChunkedEmbeds(channel, title, lines, color) {
   const chunks = chunkLines(lines, 3800);
   const embeds = chunks.map((chunk, index) => {
-    const embed = new EmbedBuilder()
-      .setDescription(chunk)
-      .setColor(0x9b59b6)
-      .setFooter({ text: "Leaderboard vibes" });
+    const embed = new EmbedBuilder().setDescription(chunk).setColor(color);
     if (index === 0) embed.setTitle(title);
     return embed;
   });
@@ -380,14 +383,13 @@ async function sendChunkedEmbeds(channel, title, lines) {
   }
 }
 
-async function sendFieldEmbeds(channel, title, fields) {
+async function sendFieldEmbeds(channel, title, fields, color) {
   const chunks = chunkFields(fields, 20);
   for (let i = 0; i < chunks.length; i += 1) {
     const embed = new EmbedBuilder()
       .setTitle(i === 0 ? title : `${title} (cont.)`)
-      .setColor(0x2ecc71)
-      .addFields(chunks[i])
-      .setFooter({ text: "Clip-worthy plays inside" });
+      .setColor(color)
+      .addFields(chunks[i]);
 
     await channel.send({
       embeds: [embed],
