@@ -35,6 +35,7 @@ const DATA_PATH = path.join("data", "leaderboard.json");
 const ALLOWED_MENTIONS = { parse: [] };
 
 const NEGATIVE_REACTIONS = parseEmojiList(process.env.NEGATIVE_REACTIONS || "");
+const IGNORED_REACTIONS = parseEmojiList(process.env.IGNORED_REACTIONS || "");
 
 const USE_MESSAGE_CONTENT_INTENT =
   String(process.env.MESSAGE_CONTENT_INTENT || "").toLowerCase() === "true";
@@ -65,15 +66,15 @@ client.on("ready", async () => {
 
 client.on("messageReactionAdd", async (reaction, user) => {
   if (user.bot) return;
-  await handleReactionChange(reaction, 1);
+  await handleReactionChange(reaction, user, 1);
 });
 
 client.on("messageReactionRemove", async (reaction, user) => {
   if (user.bot) return;
-  await handleReactionChange(reaction, -1);
+  await handleReactionChange(reaction, user, -1);
 });
 
-async function handleReactionChange(reaction, direction) {
+async function handleReactionChange(reaction, user, direction) {
   try {
     if (reaction.partial) {
       await reaction.fetch();
@@ -90,16 +91,31 @@ async function handleReactionChange(reaction, direction) {
     return;
 
   const emojiKey = normalizeEmoji(reaction.emoji);
-  const scoreDelta = getScoreDelta(emojiKey) * direction;
-  if (scoreDelta === 0) return;
+  if (IGNORED_REACTIONS.has(emojiKey)) return;
 
   const messageEntry = ensureMessageEntry(reaction.message);
+  if (messageEntry.authorId && user.id === messageEntry.authorId) return;
+
+  const isNegative = NEGATIVE_REACTIONS.has(emojiKey);
+  const userState = getUserReactionState(messageEntry, user.id);
+  const previousScore = scoreFromState(userState);
+
+  updateUserState(userState, emojiKey, isNegative, direction);
+
+  const nextScore = scoreFromState(userState);
+  messageEntry.score += nextScore - previousScore;
+
+  if (!hasAnyReactions(userState)) {
+    delete messageEntry.userReactions[user.id];
+  } else {
+    saveUserReactionState(messageEntry, user.id, userState);
+  }
+
   messageEntry.reactions[emojiKey] =
     (messageEntry.reactions[emojiKey] || 0) + direction;
   if (messageEntry.reactions[emojiKey] < 0) {
     messageEntry.reactions[emojiKey] = 0;
   }
-  messageEntry.score += scoreDelta;
 
   await persistData();
 }
@@ -115,10 +131,16 @@ function ensureMessageEntry(message) {
       content: summarizeContent(message.content),
       score: 0,
       reactions: {},
+      userReactions: {},
     };
   }
 
-  return data.messages[message.id];
+  const entry = data.messages[message.id];
+  if (!entry.reactions) entry.reactions = {};
+  if (!entry.userReactions) entry.userReactions = {};
+  if (typeof entry.score !== "number") entry.score = 0;
+
+  return entry;
 }
 
 async function postWeeklyLeaderboard() {
@@ -236,8 +258,12 @@ ${summarizeReactions(worstPost.reactions)}
 }
 
 function summarizeReactions(reactions) {
-  const totalCount = sumAllReactions(reactions);
-  const negativeCount = sumBySet(reactions, NEGATIVE_REACTIONS);
+  const totalCount = sumExcludingSet(reactions, IGNORED_REACTIONS);
+  const negativeCount = sumBySetExcluding(
+    reactions,
+    NEGATIVE_REACTIONS,
+    IGNORED_REACTIONS,
+  );
   const positiveCount = Math.max(0, totalCount - negativeCount);
   return `Reactions: +${positiveCount} / -${negativeCount}`;
 }
@@ -323,13 +349,57 @@ function sumBySet(reactions, set) {
     .reduce((total, [, count]) => total + count, 0);
 }
 
+function sumBySetExcluding(reactions, set, excludedSet) {
+  return Object.entries(reactions)
+    .filter(([emoji]) => set.has(emoji) && !excludedSet.has(emoji))
+    .reduce((total, [, count]) => total + count, 0);
+}
+
 function sumAllReactions(reactions) {
   return Object.values(reactions).reduce((total, count) => total + count, 0);
 }
 
-function getScoreDelta(emojiKey) {
-  if (NEGATIVE_REACTIONS.has(emojiKey)) return -1;
-  return 1;
+function sumExcludingSet(reactions, excludedSet) {
+  return Object.entries(reactions)
+    .filter(([emoji]) => !excludedSet.has(emoji))
+    .reduce((total, [, count]) => total + count, 0);
+}
+
+function getUserReactionState(messageEntry, userId) {
+  const stored = messageEntry.userReactions[userId];
+  return {
+    positive: new Set(stored?.positive || []),
+    negative: new Set(stored?.negative || []),
+  };
+}
+
+function saveUserReactionState(messageEntry, userId, state) {
+  messageEntry.userReactions[userId] = {
+    positive: Array.from(state.positive),
+    negative: Array.from(state.negative),
+  };
+}
+
+function updateUserState(state, emojiKey, isNegative, direction) {
+  const targetSet = isNegative ? state.negative : state.positive;
+  if (direction > 0) {
+    targetSet.add(emojiKey);
+  } else {
+    targetSet.delete(emojiKey);
+  }
+}
+
+function scoreFromState(state) {
+  const hasPositive = state.positive.size > 0;
+  const hasNegative = state.negative.size > 0;
+  if (hasPositive && hasNegative) return 0;
+  if (hasPositive) return 1;
+  if (hasNegative) return -1;
+  return 0;
+}
+
+function hasAnyReactions(state) {
+  return state.positive.size > 0 || state.negative.size > 0;
 }
 
 function parseArchiveDuration(rawValue, fallback) {

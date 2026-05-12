@@ -31,6 +31,7 @@ Copy `.env.example` to `.env` and fill in values:
 - `TARGET_CHANNEL_IDS` (required, comma-separated)
 - `SUMMARY_CHANNEL_ID` (required)
 - `NEGATIVE_REACTIONS` (comma-separated; all other reactions count as positive)
+- `IGNORED_REACTIONS` (comma-separated; excluded entirely)
 - `LEADERBOARD_CRON` (optional, default `0 9 * * 1`)
 - `LEADERBOARD_LIMIT` (optional, default `10`)
 - `WORST_POST_LIMIT` (optional, default `3`)
@@ -59,5 +60,11 @@ Data is persisted to `./data` via the Docker volume defined in `docker-compose.y
 
 ## Notes
 
+- Scoring is per user per message:
+  - If a user reacts only with positive emojis, the message gets +1.
+  - If a user reacts only with negative emojis, the message gets -1.
+  - If a user uses both positive and negative emojis, it counts as 0.
+  - Reactions from the message author are ignored.
+  - Ignored emojis are excluded from scoring entirely.
 - The bot only tracks reactions while it is running. If you want to backfill historical data, let me know and I can add a one-time sync.
 - Leaderboard scheduling uses the container/server time zone.
