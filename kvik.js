@@ -71,7 +71,13 @@ export async function postKvikDigest({
     return `#${index + 1} • ${author}\n${content}\n${entry.jumpUrl}`;
   });
 
-  await sendChunkedEmbeds(summaryChannel, allowedMentions, title, lines);
+  const prefixedTitle = `<:kuzelbotinternal:1503797773689159822> ${title}`;
+  await sendChunkedEmbeds(
+    summaryChannel,
+    allowedMentions,
+    prefixedTitle,
+    lines,
+  );
 
   data.kvik.messages = {};
 }
@@ -82,7 +88,7 @@ async function sendChunkedEmbeds(channel, allowedMentions, title, lines) {
     const embed = new EmbedBuilder()
       .setDescription(chunks[i])
       .setColor(0xf1c40f)
-      .setFooter({ text: "Clip it or it didn't happen" });
+      .setFooter({ text: "Caught in 4K!" });
 
     if (i === 0) embed.setTitle(title);
 
