@@ -311,6 +311,13 @@ function getScoreDelta(emojiKey) {
   return 0;
 }
 
+function parseArchiveDuration(rawValue, fallback) {
+  const allowed = new Set([60, 1440, 4320, 10080]);
+  const parsed = Number(rawValue);
+  if (allowed.has(parsed)) return parsed;
+  return fallback;
+}
+
 function parseIdList(rawList) {
   return new Set(
     (rawList || "")
