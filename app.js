@@ -172,6 +172,7 @@ function ensureMessageEntry(message) {
       createdTimestamp: message.createdTimestamp,
       jumpUrl: message.url,
       content: summarizeContent(message.content),
+      imageUrl: extractImageUrl(message),
       score: 0,
       reactions: {},
       userReactions: {},
@@ -182,6 +183,10 @@ function ensureMessageEntry(message) {
   if (!entry.reactions) entry.reactions = {};
   if (!entry.userReactions) entry.userReactions = {};
   if (typeof entry.score !== "number") entry.score = 0;
+  if (!entry.imageUrl) {
+    const imageUrl = extractImageUrl(message);
+    if (imageUrl) entry.imageUrl = imageUrl;
+  }
 
   return entry;
 }
@@ -310,9 +315,7 @@ function summarizeReactions(reactions) {
   );
   const positiveCount = Math.max(0, totalCount - negativeCount);
   const finalScore = positiveCount - negativeCount;
-  return `<:up:1503802122162929694> ${positiveCount} / <:down:1503802156556488914> ${negativeCount} <:equals:1503802180736385116> ${finalScore}\n
-<:up:1503802122162929694> ${positiveCount} <:down:1503802156556488914> ${negativeCount} <:equals:1503802180736385116> ${finalScore}\n
-<:up:1503802122162929694> ${positiveCount} <:down:1503802156556488914> ${negativeCount}<:equals:1503802180736385116>${finalScore}`;
+  return `<:up:1503802122162929694> ${positiveCount} / <:down:1503802156556488914> ${negativeCount} / <:equals:1503802180736385116> ${finalScore}`;
 }
 
 function aggregateAuthorScores(entries) {
@@ -352,11 +355,23 @@ async function sendPostLeaderboard(channel, title, entries) {
     return;
   }
 
-  const fields = entries.map((entry, index) => {
+  const rankedEntries = entries.map((entry, index) => ({
+    entry,
+    rank: index + 1,
+  }));
+
+  const imageOnlyEntries = rankedEntries.filter(
+    ({ entry }) => entry.imageUrl && !entry.content,
+  );
+  const fieldEntries = rankedEntries.filter(
+    ({ entry }) => !(entry.imageUrl && !entry.content),
+  );
+
+  const fields = fieldEntries.map(({ entry, rank }) => {
     const breakdown = summarizeReactions(entry.reactions);
     const content = entry.content || "No message content available.";
     return {
-      name: `#${index + 1} • Score ${entry.score}`,
+      name: `#${rank} • Score ${entry.score}`,
       value: `${content}\n${breakdown}\n${entry.jumpUrl}`,
     };
   });
@@ -367,7 +382,19 @@ async function sendPostLeaderboard(channel, title, entries) {
       ? 0xe74c3c
       : 0x5865f2;
 
-  await sendFieldEmbeds(channel, title, fields, embedColor);
+  if (fields.length > 0) {
+    await sendFieldEmbeds(channel, title, fields, embedColor);
+  }
+
+  if (imageOnlyEntries.length > 0) {
+    await sendImagePostEmbeds(
+      channel,
+      title,
+      imageOnlyEntries,
+      embedColor,
+      fields.length === 0,
+    );
+  }
 }
 
 async function sendChunkedEmbeds(channel, title, lines, color) {
@@ -393,6 +420,36 @@ async function sendFieldEmbeds(channel, title, fields, color) {
       .setTitle(i === 0 ? title : `${title} (cont.)`)
       .setColor(color)
       .addFields(chunks[i]);
+
+    await channel.send({
+      embeds: [embed],
+      allowedMentions: ALLOWED_MENTIONS,
+    });
+  }
+}
+
+async function sendImagePostEmbeds(
+  channel,
+  title,
+  entries,
+  color,
+  includeTitle,
+) {
+  for (let i = 0; i < entries.length; i += 1) {
+    const { entry, rank } = entries[i];
+    const breakdown = summarizeReactions(entry.reactions);
+    const embed = new EmbedBuilder()
+      .setColor(color)
+      .setDescription(`${breakdown}\n${entry.jumpUrl}`)
+      .setImage(entry.imageUrl);
+
+    if (includeTitle && i === 0) {
+      embed.setTitle(title);
+    }
+
+    embed.setAuthor({
+      name: `#${rank} • Score ${entry.score}`,
+    });
 
     await channel.send({
       embeds: [embed],
@@ -527,6 +584,23 @@ function normalizeEmoji(emoji) {
     return `${emoji.name}:${emoji.id}`;
   }
   return emoji.name;
+}
+
+function extractImageUrl(message) {
+  if (!message?.attachments || message.attachments.size === 0) return null;
+  for (const attachment of message.attachments.values()) {
+    if (isImageAttachment(attachment)) {
+      return attachment.url || null;
+    }
+  }
+  return null;
+}
+
+function isImageAttachment(attachment) {
+  if (!attachment) return false;
+  if (attachment.contentType?.startsWith("image/")) return true;
+  const name = attachment.name || "";
+  return /\.(png|jpe?g|gif|webp|bmp|tiff)$/i.test(name);
 }
 
 function summarizeContent(content) {
