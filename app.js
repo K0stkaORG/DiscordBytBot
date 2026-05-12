@@ -32,6 +32,7 @@ const THREAD_AUTO_ARCHIVE_MINUTES = parseArchiveDuration(
   10080,
 );
 const DATA_PATH = path.join("data", "leaderboard.json");
+const ALLOWED_MENTIONS = { parse: [] };
 
 const POSITIVE_REACTIONS = parseEmojiList(process.env.POSITIVE_REACTIONS || "");
 const NEGATIVE_REACTIONS = parseEmojiList(process.env.NEGATIVE_REACTIONS || "");
@@ -140,7 +141,10 @@ async function postWeeklyLeaderboard() {
   );
 
   if (weeklyEntries.length === 0) {
-    await summaryChannel.send("No scored posts in the last week.");
+    await summaryChannel.send({
+      content: "No scored posts in the last week.",
+      allowedMentions: ALLOWED_MENTIONS,
+    });
     return;
   }
 
@@ -210,7 +214,10 @@ ${summarizeReactions(worstPost.reactions)}
       : "No data",
   });
 
-  const summaryMessage = await summaryChannel.send({ embeds: [summaryEmbed] });
+  const summaryMessage = await summaryChannel.send({
+    embeds: [summaryEmbed],
+    allowedMentions: ALLOWED_MENTIONS,
+  });
 
   if (!summaryMessage || !summaryMessage.startThread) {
     console.error("Failed to create thread for leaderboard details.");
@@ -252,7 +259,10 @@ function aggregateAuthorScores(entries) {
 
 async function sendAuthorLeaderboard(channel, authorScores) {
   if (authorScores.length === 0) {
-    await channel.send("No author scores available.");
+    await channel.send({
+      content: "No author scores available.",
+      allowedMentions: ALLOWED_MENTIONS,
+    });
     return;
   }
 
@@ -264,7 +274,10 @@ async function sendAuthorLeaderboard(channel, authorScores) {
 
 async function sendPostLeaderboard(channel, title, entries) {
   if (entries.length === 0) {
-    await channel.send(`${title}: no posts available.`);
+    await channel.send({
+      content: `${title}: no posts available.`,
+      allowedMentions: ALLOWED_MENTIONS,
+    });
     return;
   }
 
@@ -281,7 +294,10 @@ async function sendChunkedLines(channel, title, lines) {
   const chunks = chunkLines(lines, 1800);
   for (let i = 0; i < chunks.length; i += 1) {
     const header = i === 0 ? `**${title}**\n` : "";
-    await channel.send(`${header}${chunks[i]}`);
+    await channel.send({
+      content: `${header}${chunks[i]}`,
+      allowedMentions: ALLOWED_MENTIONS,
+    });
   }
 }
 
