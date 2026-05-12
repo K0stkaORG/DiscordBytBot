@@ -3,6 +3,12 @@ import fs from "fs/promises";
 import path from "path";
 import cron from "node-cron";
 import { Client, GatewayIntentBits, Partials, EmbedBuilder } from "discord.js";
+import {
+  parseKvikEmoji,
+  ensureKvikData,
+  trackKvikReaction,
+  postKvikDigest,
+} from "./kvik.js";
 
 const REQUIRED_ENV_VARS = [
   "DISCORD_TOKEN",
@@ -34,6 +40,10 @@ const THREAD_AUTO_ARCHIVE_MINUTES = parseArchiveDuration(
 const DATA_PATH = path.join("data", "leaderboard.json");
 const ALLOWED_MENTIONS = { parse: [] };
 
+const KVIK_REACTION = parseKvikEmoji(process.env.KVIK_REACTION || "");
+const KVIK_CRON = process.env.KVIK_CRON || null;
+const KVIK_TITLE = process.env.KVIK_TITLE || "Kvík of the week";
+
 const NEGATIVE_REACTIONS = parseEmojiList(process.env.NEGATIVE_REACTIONS || "");
 const IGNORED_REACTIONS = parseEmojiList(process.env.IGNORED_REACTIONS || "");
 
@@ -51,6 +61,7 @@ const client = new Client({
 });
 
 let data = await loadData();
+ensureKvikData(data);
 let saveInFlight = null;
 
 client.on("ready", async () => {
@@ -62,6 +73,23 @@ client.on("ready", async () => {
       console.error("Failed to post leaderboard:", error);
     }
   });
+
+  if (KVIK_REACTION && KVIK_CRON) {
+    cron.schedule(KVIK_CRON, async () => {
+      try {
+        await postKvikDigest({
+          client,
+          summaryChannelId: SUMMARY_CHANNEL_ID,
+          data,
+          allowedMentions: ALLOWED_MENTIONS,
+          title: KVIK_TITLE,
+        });
+        await persistData();
+      } catch (error) {
+        console.error("Failed to post Kvík of the week:", error);
+      }
+    });
+  }
 });
 
 client.on("messageReactionAdd", async (reaction, user) => {
@@ -91,9 +119,22 @@ async function handleReactionChange(reaction, user, direction) {
     return;
 
   const emojiKey = normalizeEmoji(reaction.emoji);
-  if (IGNORED_REACTIONS.has(emojiKey)) return;
-
   const messageEntry = ensureMessageEntry(reaction.message);
+
+  if (KVIK_REACTION) {
+    const updated = trackKvikReaction({
+      data,
+      messageEntry,
+      emojiKey,
+      kvikEmojiKey: KVIK_REACTION,
+      reactionCount: reaction.count,
+    });
+    if (updated) {
+      await persistData();
+    }
+  }
+
+  if (IGNORED_REACTIONS.has(emojiKey)) return;
   if (messageEntry.authorId && user.id === messageEntry.authorId) return;
 
   const isNegative = NEGATIVE_REACTIONS.has(emojiKey);

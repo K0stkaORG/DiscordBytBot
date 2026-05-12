@@ -35,6 +35,9 @@ Copy `.env.example` to `.env` and fill in values:
 - `LEADERBOARD_CRON` (optional, default `0 9 * * 1`)
 - `LEADERBOARD_LIMIT` (optional, default `10`)
 - `WORST_POST_LIMIT` (optional, default `3`)
+- `KVIK_REACTION` (optional, emoji that marks a post for Kvík of the week)
+- `KVIK_CRON` (optional, schedule for Kvík of the week)
+- `KVIK_TITLE` (optional, title for the Kvík of the week post)
 - `MESSAGE_CONTENT_INTENT` (optional, set to `true` only if you enabled the Message Content Intent)
 
 Negative reaction values accept unicode or custom emojis. Custom emojis can be provided as either `name:id` or the full `<:name:id>` format.
@@ -66,5 +69,6 @@ Data is persisted to `./data` via the Docker volume defined in `docker-compose.y
   - If a user uses both positive and negative emojis, it counts as 0.
   - Reactions from the message author are ignored.
   - Ignored emojis are excluded from scoring entirely.
+- Kvík of the week posts are collected when the configured reaction is present, and sent on the configured cron schedule.
 - The bot only tracks reactions while it is running. If you want to backfill historical data, let me know and I can add a one-time sync.
 - Leaderboard scheduling uses the container/server time zone.
