@@ -4,7 +4,11 @@ import path from "path";
 import cron from "node-cron";
 import { Client, GatewayIntentBits, Partials, EmbedBuilder } from "discord.js";
 
-const REQUIRED_ENV_VARS = ["DISCORD_TOKEN", "TARGET_CHANNEL_ID"];
+const REQUIRED_ENV_VARS = [
+  "DISCORD_TOKEN",
+  "TARGET_CHANNEL_IDS",
+  "SUMMARY_CHANNEL_ID",
+];
 const missingVars = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
 if (missingVars.length > 0) {
   throw new Error(
@@ -12,11 +16,21 @@ if (missingVars.length > 0) {
   );
 }
 
-const TARGET_CHANNEL_ID = process.env.TARGET_CHANNEL_ID;
-const LEADERBOARD_CHANNEL_ID =
-  process.env.LEADERBOARD_CHANNEL_ID || TARGET_CHANNEL_ID;
+const TARGET_CHANNEL_IDS = parseIdList(process.env.TARGET_CHANNEL_IDS);
+const SUMMARY_CHANNEL_ID = process.env.SUMMARY_CHANNEL_ID;
+if (TARGET_CHANNEL_IDS.size === 0) {
+  throw new Error("TARGET_CHANNEL_IDS must include at least one channel ID.");
+}
 const LEADERBOARD_CRON = process.env.LEADERBOARD_CRON || "0 9 * * 1";
 const LEADERBOARD_LIMIT = Number(process.env.LEADERBOARD_LIMIT || 10);
+const WORST_POST_LIMIT = Number(process.env.WORST_POST_LIMIT || 3);
+const SUMMARY_TITLE = process.env.SUMMARY_TITLE || "Weekly Reaction Summary";
+const SUMMARY_DESCRIPTION = process.env.SUMMARY_DESCRIPTION || null;
+const THREAD_TITLE = process.env.THREAD_TITLE || "Weekly Leaderboard Details";
+const THREAD_AUTO_ARCHIVE_MINUTES = parseArchiveDuration(
+  process.env.THREAD_AUTO_ARCHIVE_MINUTES,
+  10080,
+);
 const DATA_PATH = path.join("data", "leaderboard.json");
 
 const POSITIVE_REACTIONS = parseEmojiList(process.env.POSITIVE_REACTIONS || "");
@@ -78,7 +92,7 @@ async function handleReactionChange(reaction, direction) {
     return;
   }
 
-  if (!reaction.message || reaction.message.channelId !== TARGET_CHANNEL_ID)
+  if (!reaction.message || !TARGET_CHANNEL_IDS.has(reaction.message.channelId))
     return;
 
   const emojiKey = normalizeEmoji(reaction.emoji);
@@ -114,67 +128,103 @@ function ensureMessageEntry(message) {
 }
 
 async function postWeeklyLeaderboard() {
-  const leaderboardChannel = await client.channels.fetch(
-    LEADERBOARD_CHANNEL_ID,
-  );
-  if (!leaderboardChannel || !leaderboardChannel.isTextBased()) {
-    console.error("Leaderboard channel is not text-based or is missing.");
+  const summaryChannel = await client.channels.fetch(SUMMARY_CHANNEL_ID);
+  if (!summaryChannel || !summaryChannel.isTextBased()) {
+    console.error("Summary channel is not text-based or is missing.");
     return;
   }
 
   const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const entries = Object.values(data.messages)
-    .filter((entry) => entry.createdTimestamp >= oneWeekAgo)
+  const weeklyEntries = Object.values(data.messages).filter(
+    (entry) => entry.createdTimestamp >= oneWeekAgo,
+  );
+
+  if (weeklyEntries.length === 0) {
+    await summaryChannel.send("No scored posts in the last week.");
+    return;
+  }
+
+  const authorScores = aggregateAuthorScores(weeklyEntries);
+  const topPosts = weeklyEntries
+    .slice()
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return a.createdTimestamp - b.createdTimestamp;
     })
     .slice(0, LEADERBOARD_LIMIT);
 
-  if (entries.length === 0) {
-    await leaderboardChannel.send("No scored posts in the last week.");
-    return;
-  }
+  const worstPosts = weeklyEntries
+    .slice()
+    .sort((a, b) => {
+      if (a.score !== b.score) return a.score - b.score;
+      return a.createdTimestamp - b.createdTimestamp;
+    })
+    .slice(0, WORST_POST_LIMIT);
 
-  const authorScores = aggregateAuthorScores(
-    Object.values(data.messages).filter(
-      (entry) => entry.createdTimestamp >= oneWeekAgo,
-    ),
-  );
+  const bestAuthor = authorScores[0] || null;
+  const worstAuthor = authorScores[authorScores.length - 1] || null;
+  const bestPost = topPosts[0] || null;
+  const worstPost = worstPosts[0] || null;
 
-  const embed = new EmbedBuilder()
-    .setTitle("Weekly Reaction Leaderboard")
-    .setDescription(
-      `Top posts and authors from the last 7 days in <#${TARGET_CHANNEL_ID}>.`,
-    )
+  const summaryDescription = SUMMARY_DESCRIPTION
+    ? SUMMARY_DESCRIPTION
+    : `Summary for the last 7 days across ${TARGET_CHANNEL_IDS.size} channels.`;
+
+  const summaryEmbed = new EmbedBuilder()
+    .setTitle(SUMMARY_TITLE)
+    .setDescription(summaryDescription)
     .setColor(0x5865f2)
     .setTimestamp(new Date());
 
-  if (authorScores.length > 0) {
-    const authorLines = authorScores
-      .slice(0, LEADERBOARD_LIMIT)
-      .map(
-        (entry, index) =>
-          `#${index + 1} • <@${entry.authorId}> — ${entry.score}`,
-      )
-      .join("\n");
-
-    embed.addFields({
-      name: "Top Authors",
-      value: authorLines,
-    });
-  }
-
-  entries.forEach((entry, index) => {
-    const breakdown = summarizeReactions(entry.reactions);
-    const content = entry.content || "No message content available.";
-    embed.addFields({
-      name: `#${index + 1} • Score ${entry.score}`,
-      value: `${content}\n${breakdown}\n[Jump to message](${entry.jumpUrl})`,
-    });
+  summaryEmbed.addFields({
+    name: "Best Author",
+    value: bestAuthor
+      ? `<@${bestAuthor.authorId}> — ${bestAuthor.score}`
+      : "No data",
+    inline: true,
   });
 
-  await leaderboardChannel.send({ embeds: [embed] });
+  summaryEmbed.addFields({
+    name: "Worst Author",
+    value: worstAuthor
+      ? `<@${worstAuthor.authorId}> — ${worstAuthor.score}`
+      : "No data",
+    inline: true,
+  });
+
+  summaryEmbed.addFields({
+    name: "Best Post",
+    value: bestPost
+      ? `${bestPost.content || "No message content available."}
+${summarizeReactions(bestPost.reactions)}
+[Jump to message](${bestPost.jumpUrl})`
+      : "No data",
+  });
+
+  summaryEmbed.addFields({
+    name: "Worst Post",
+    value: worstPost
+      ? `${worstPost.content || "No message content available."}
+${summarizeReactions(worstPost.reactions)}
+[Jump to message](${worstPost.jumpUrl})`
+      : "No data",
+  });
+
+  const summaryMessage = await summaryChannel.send({ embeds: [summaryEmbed] });
+
+  if (!summaryMessage || !summaryMessage.startThread) {
+    console.error("Failed to create thread for leaderboard details.");
+    return;
+  }
+
+  const thread = await summaryMessage.startThread({
+    name: THREAD_TITLE,
+    autoArchiveDuration: THREAD_AUTO_ARCHIVE_MINUTES,
+  });
+
+  await sendAuthorLeaderboard(thread, authorScores);
+  await sendPostLeaderboard(thread, "Top 10 Posts", topPosts);
+  await sendPostLeaderboard(thread, "Worst 3 Posts", worstPosts);
 }
 
 function summarizeReactions(reactions) {
@@ -196,6 +246,59 @@ function aggregateAuthorScores(entries) {
     .sort((a, b) => b.score - a.score);
 }
 
+async function sendAuthorLeaderboard(channel, authorScores) {
+  if (authorScores.length === 0) {
+    await channel.send("No author scores available.");
+    return;
+  }
+
+  const lines = authorScores.map(
+    (entry, index) => `#${index + 1} • <@${entry.authorId}> — ${entry.score}`,
+  );
+  await sendChunkedLines(channel, "Full Author Leaderboard", lines);
+}
+
+async function sendPostLeaderboard(channel, title, entries) {
+  if (entries.length === 0) {
+    await channel.send(`${title}: no posts available.`);
+    return;
+  }
+
+  const lines = entries.map((entry, index) => {
+    const breakdown = summarizeReactions(entry.reactions);
+    const content = entry.content || "No message content available.";
+    return `#${index + 1} • Score ${entry.score}\n${content}\n${breakdown}\n${entry.jumpUrl}`;
+  });
+
+  await sendChunkedLines(channel, title, lines);
+}
+
+async function sendChunkedLines(channel, title, lines) {
+  const chunks = chunkLines(lines, 1800);
+  for (let i = 0; i < chunks.length; i += 1) {
+    const header = i === 0 ? `**${title}**\n` : "";
+    await channel.send(`${header}${chunks[i]}`);
+  }
+}
+
+function chunkLines(lines, maxLength) {
+  const chunks = [];
+  let current = "";
+
+  lines.forEach((line) => {
+    const lineWithNewline = current.length === 0 ? line : `\n${line}`;
+    if (current.length + lineWithNewline.length > maxLength) {
+      if (current.length > 0) chunks.push(current);
+      current = line;
+    } else {
+      current += lineWithNewline;
+    }
+  });
+
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
 function sumBySet(reactions, set) {
   return Object.entries(reactions)
     .filter(([emoji]) => set.has(emoji))
@@ -206,6 +309,15 @@ function getScoreDelta(emojiKey) {
   if (POSITIVE_REACTIONS.has(emojiKey)) return 1;
   if (NEGATIVE_REACTIONS.has(emojiKey)) return -1;
   return 0;
+}
+
+function parseIdList(rawList) {
+  return new Set(
+    (rawList || "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
 }
 
 function parseEmojiList(rawList) {
