@@ -360,41 +360,13 @@ async function sendPostLeaderboard(channel, title, entries) {
     rank: index + 1,
   }));
 
-  const imageOnlyEntries = rankedEntries.filter(
-    ({ entry }) => entry.imageUrl && !entry.content,
-  );
-  const fieldEntries = rankedEntries.filter(
-    ({ entry }) => !(entry.imageUrl && !entry.content),
-  );
-
-  const fields = fieldEntries.map(({ entry, rank }) => {
-    const breakdown = summarizeReactions(entry.reactions);
-    const content = entry.content || "No message content available.";
-    return {
-      name: `#${rank} • Score ${entry.score}`,
-      value: `${content}\n${breakdown}\n${entry.jumpUrl}`,
-    };
-  });
-
   const embedColor = title.startsWith("🔥")
     ? 0x2ecc71
     : title.startsWith("💀")
       ? 0xe74c3c
       : 0x5865f2;
 
-  if (fields.length > 0) {
-    await sendFieldEmbeds(channel, title, fields, embedColor);
-  }
-
-  if (imageOnlyEntries.length > 0) {
-    await sendImagePostEmbeds(
-      channel,
-      title,
-      imageOnlyEntries,
-      embedColor,
-      fields.length === 0,
-    );
-  }
+  await sendPostEmbeds(channel, title, rankedEntries, embedColor);
 }
 
 async function sendChunkedEmbeds(channel, title, lines, color) {
@@ -413,43 +385,24 @@ async function sendChunkedEmbeds(channel, title, lines, color) {
   }
 }
 
-async function sendFieldEmbeds(channel, title, fields, color) {
-  const chunks = chunkFields(fields, 20);
-  for (let i = 0; i < chunks.length; i += 1) {
-    const embed = new EmbedBuilder()
-      .setTitle(i === 0 ? title : `${title} (cont.)`)
-      .setColor(color)
-      .addFields(chunks[i]);
-
-    await channel.send({
-      embeds: [embed],
-      allowedMentions: ALLOWED_MENTIONS,
-    });
-  }
-}
-
-async function sendImagePostEmbeds(
-  channel,
-  title,
-  entries,
-  color,
-  includeTitle,
-) {
+async function sendPostEmbeds(channel, title, entries, color) {
   for (let i = 0; i < entries.length; i += 1) {
     const { entry, rank } = entries[i];
     const breakdown = summarizeReactions(entry.reactions);
+    const content = entry.content || "No message content available.";
+
     const embed = new EmbedBuilder()
       .setColor(color)
-      .setDescription(`${breakdown}\n${entry.jumpUrl}`)
-      .setImage(entry.imageUrl);
+      .setDescription(`${content}\n${breakdown}\n${entry.jumpUrl}`)
+      .setAuthor({ name: `#${rank} • Score ${entry.score}` });
 
-    if (includeTitle && i === 0) {
+    if (i === 0) {
       embed.setTitle(title);
     }
 
-    embed.setAuthor({
-      name: `#${rank} • Score ${entry.score}`,
-    });
+    if (entry.imageUrl) {
+      embed.setImage(entry.imageUrl);
+    }
 
     await channel.send({
       embeds: [embed],
@@ -473,14 +426,6 @@ function chunkLines(lines, maxLength) {
   });
 
   if (current.length > 0) chunks.push(current);
-  return chunks;
-}
-
-function chunkFields(fields, chunkSize) {
-  const chunks = [];
-  for (let i = 0; i < fields.length; i += chunkSize) {
-    chunks.push(fields.slice(i, i + chunkSize));
-  }
   return chunks;
 }
 
