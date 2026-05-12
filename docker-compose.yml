@@ -1,5 +1,5 @@
 services:
-  reaction-bot:
+  discord-bytbot:
     build: .
     container_name: discord-bytbot
     restart: unless-stopped
