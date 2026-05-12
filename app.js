@@ -34,14 +34,7 @@ const THREAD_AUTO_ARCHIVE_MINUTES = parseArchiveDuration(
 const DATA_PATH = path.join("data", "leaderboard.json");
 const ALLOWED_MENTIONS = { parse: [] };
 
-const POSITIVE_REACTIONS = parseEmojiList(process.env.POSITIVE_REACTIONS || "");
 const NEGATIVE_REACTIONS = parseEmojiList(process.env.NEGATIVE_REACTIONS || "");
-
-if (POSITIVE_REACTIONS.size === 0 && NEGATIVE_REACTIONS.size === 0) {
-  throw new Error(
-    "Set POSITIVE_REACTIONS and/or NEGATIVE_REACTIONS to enable scoring.",
-  );
-}
 
 const USE_MESSAGE_CONTENT_INTENT =
   String(process.env.MESSAGE_CONTENT_INTENT || "").toLowerCase() === "true";
@@ -239,8 +232,9 @@ ${summarizeReactions(worstPost.reactions)}
 }
 
 function summarizeReactions(reactions) {
-  const positiveCount = sumBySet(reactions, POSITIVE_REACTIONS);
+  const totalCount = sumAllReactions(reactions);
   const negativeCount = sumBySet(reactions, NEGATIVE_REACTIONS);
+  const positiveCount = Math.max(0, totalCount - negativeCount);
   return `Reactions: +${positiveCount} / -${negativeCount}`;
 }
 
@@ -325,10 +319,13 @@ function sumBySet(reactions, set) {
     .reduce((total, [, count]) => total + count, 0);
 }
 
+function sumAllReactions(reactions) {
+  return Object.values(reactions).reduce((total, count) => total + count, 0);
+}
+
 function getScoreDelta(emojiKey) {
-  if (POSITIVE_REACTIONS.has(emojiKey)) return 1;
   if (NEGATIVE_REACTIONS.has(emojiKey)) return -1;
-  return 0;
+  return 1;
 }
 
 function parseArchiveDuration(rawValue, fallback) {

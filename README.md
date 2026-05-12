@@ -30,14 +30,13 @@ Copy `.env.example` to `.env` and fill in values:
 - `DISCORD_TOKEN` (required)
 - `TARGET_CHANNEL_IDS` (required, comma-separated)
 - `SUMMARY_CHANNEL_ID` (required)
-- `POSITIVE_REACTIONS` (comma-separated)
-- `NEGATIVE_REACTIONS` (comma-separated)
+- `NEGATIVE_REACTIONS` (comma-separated; all other reactions count as positive)
 - `LEADERBOARD_CRON` (optional, default `0 9 * * 1`)
 - `LEADERBOARD_LIMIT` (optional, default `10`)
 - `WORST_POST_LIMIT` (optional, default `3`)
 - `MESSAGE_CONTENT_INTENT` (optional, set to `true` only if you enabled the Message Content Intent)
 
-Reaction values accept unicode or custom emojis. Custom emojis can be provided as either `name:id` or the full `<:name:id>` format.
+Negative reaction values accept unicode or custom emojis. Custom emojis can be provided as either `name:id` or the full `<:name:id>` format.
 
 ## Local development (Bun)
 
