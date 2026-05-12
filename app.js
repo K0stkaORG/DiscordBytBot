@@ -288,16 +288,8 @@ ${summarizeReactions(worstPost.reactions)}
   });
 
   await sendAuthorLeaderboard(thread, authorScores);
-  await sendPostLeaderboard(
-    thread,
-    `🔥 Top ${LEADERBOARD_LIMIT} Posts`,
-    topPosts,
-  );
-  await sendPostLeaderboard(
-    thread,
-    `💀 Worst ${WORST_POST_LIMIT} Posts`,
-    worstPosts,
-  );
+  await sendPostLeaderboard(thread, topPosts, "top");
+  await sendPostLeaderboard(thread, worstPosts, "worst");
 }
 
 function summarizeReactions(reactions) {
@@ -309,7 +301,7 @@ function summarizeReactions(reactions) {
   );
   const positiveCount = Math.max(0, totalCount - negativeCount);
   const finalScore = positiveCount - negativeCount;
-  return `<:up:1503802122162929694> ${positiveCount} / <:down:1503802156556488914> ${negativeCount} <:equals:1503802180736385116> ${finalScore}`;
+  return `<:up:1503802122162929694> ${positiveCount} / <:down:1503802156556488914> ${negativeCount} / <:equals:1503802180736385116> **${finalScore}**`;
 }
 
 function aggregateAuthorScores(entries) {
@@ -340,10 +332,10 @@ async function sendAuthorLeaderboard(channel, authorScores) {
   await sendChunkedEmbeds(channel, "🏅 Personal Leaderboard", lines, 0xf1c40f);
 }
 
-async function sendPostLeaderboard(channel, title, entries) {
+async function sendPostLeaderboard(channel, entries, listType) {
   if (entries.length === 0) {
     await channel.send({
-      content: `${title}: no posts available.`,
+      content: "No posts available for this list.",
       allowedMentions: ALLOWED_MENTIONS,
     });
     return;
@@ -354,13 +346,10 @@ async function sendPostLeaderboard(channel, title, entries) {
     rank: index + 1,
   }));
 
-  const embedColor = title.startsWith("🔥")
-    ? 0x2ecc71
-    : title.startsWith("💀")
-      ? 0xe74c3c
-      : 0x5865f2;
+  const embedColor =
+    listType === "top" ? 0x2ecc71 : listType === "worst" ? 0xe74c3c : 0x5865f2;
 
-  await sendPostEmbeds(channel, title, rankedEntries, embedColor);
+  await sendPostEmbeds(channel, rankedEntries, embedColor, listType);
 }
 
 async function sendChunkedEmbeds(channel, title, lines, color) {
@@ -379,23 +368,24 @@ async function sendChunkedEmbeds(channel, title, lines, color) {
   }
 }
 
-async function sendPostEmbeds(channel, title, entries, color) {
-  const isTopList = title.startsWith("🔥");
-  const isWorstList = title.startsWith("💀");
-  const topLabels = ["🔥 Bestest", "🔥 Bester", "🔥 Best"];
-  const worstLabels = ["💀 Worstest", "💀 Worster", "💀 Worst"];
+async function sendPostEmbeds(channel, entries, color, listType) {
+  const isTopList = listType === "top";
+  const isWorstList = listType === "worst";
+  const topLabels = ["Bestest", "Bester", "Best"];
+  const worstLabels = ["Worstest", "Worster", "Worst"];
 
   for (let i = 0; i < entries.length; i += 1) {
     const { entry, rank } = entries[i];
     const breakdown = summarizeReactions(entry.reactions);
-    const hasContent = Boolean(entry.content);
-    const content = hasContent ? entry.content : "";
+    const content = entry.content || "";
 
     let labelPrefix = `#${rank}`;
     if (i < 3 && isTopList) {
-      labelPrefix = topLabels[i];
+      const authorTag = entry.authorId ? ` • <@${entry.authorId}>` : "";
+      labelPrefix = `${topLabels[i]}${authorTag}`;
     } else if (i < 3 && isWorstList) {
-      labelPrefix = worstLabels[i];
+      const authorTag = entry.authorId ? ` • <@${entry.authorId}>` : "";
+      labelPrefix = `${worstLabels[i]}${authorTag}`;
     }
 
     const descriptionParts = [content, breakdown, entry.jumpUrl].filter(
@@ -405,11 +395,7 @@ async function sendPostEmbeds(channel, title, entries, color) {
     const embed = new EmbedBuilder()
       .setColor(color)
       .setDescription(descriptionParts.join("\n"))
-      .setAuthor({ name: `${labelPrefix} • Score ${entry.score}` });
-
-    if (i === 0) {
-      embed.setTitle(title);
-    }
+      .setAuthor({ name: labelPrefix });
 
     if (entry.imageUrl) {
       embed.setImage(entry.imageUrl);
