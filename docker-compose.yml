@@ -1,11 +1,9 @@
-version: "3.9"
-
 services:
   reaction-bot:
     build: .
-    container_name: reaction-bot
+    container_name: discord-bytbot
     restart: unless-stopped
     env_file:
       - .env
     volumes:
-      - ./data:/app/data
+      - /home/byttorrent/docker/bytbot:/app/data
