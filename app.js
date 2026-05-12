@@ -315,7 +315,9 @@ function summarizeReactions(reactions) {
   );
   const positiveCount = Math.max(0, totalCount - negativeCount);
   const finalScore = positiveCount - negativeCount;
-  return `<:up:1503802122162929694> ${positiveCount} / <:down:1503802156556488914> ${negativeCount} / <:equals:1503802180736385116> ${finalScore}`;
+  return `<:up:1503802122162929694> ${positiveCount} / <:down:1503802156556488914> ${negativeCount} <:equals:1503802180736385116> ${finalScore}\n
+<:up:1503802122162929694> ${positiveCount} <:down:1503802156556488914> ${negativeCount} <:equals:1503802180736385116> ${finalScore}\n
+<:up:1503802122162929694> ${positiveCount} <:down:1503802156556488914> ${negativeCount}<:equals:1503802180736385116>${finalScore}`;
 }
 
 function aggregateAuthorScores(entries) {
