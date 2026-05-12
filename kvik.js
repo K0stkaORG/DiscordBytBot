@@ -81,7 +81,8 @@ async function sendChunkedEmbeds(channel, allowedMentions, title, lines) {
   for (let i = 0; i < chunks.length; i += 1) {
     const embed = new EmbedBuilder()
       .setDescription(chunks[i])
-      .setColor(0x5865f2);
+      .setColor(0xf1c40f)
+      .setFooter({ text: "Clip it or it didn't happen" });
 
     if (i === 0) embed.setTitle(title);
 

@@ -30,9 +30,10 @@ if (TARGET_CHANNEL_IDS.size === 0) {
 const LEADERBOARD_CRON = process.env.LEADERBOARD_CRON || "0 9 * * 1";
 const LEADERBOARD_LIMIT = Number(process.env.LEADERBOARD_LIMIT || 10);
 const WORST_POST_LIMIT = Number(process.env.WORST_POST_LIMIT || 3);
-const SUMMARY_TITLE = process.env.SUMMARY_TITLE || "Weekly Reaction Summary";
+const SUMMARY_TITLE = process.env.SUMMARY_TITLE || "🏆 Weekly Reaction Summary";
 const SUMMARY_DESCRIPTION = process.env.SUMMARY_DESCRIPTION || null;
-const THREAD_TITLE = process.env.THREAD_TITLE || "Weekly Leaderboard Details";
+const THREAD_TITLE =
+  process.env.THREAD_TITLE || "🎮 Weekly Leaderboard Details";
 const THREAD_AUTO_ARCHIVE_MINUTES = parseArchiveDuration(
   process.env.THREAD_AUTO_ARCHIVE_MINUTES,
   10080,
@@ -42,7 +43,8 @@ const ALLOWED_MENTIONS = { parse: [] };
 
 const KVIK_REACTION = parseKvikEmoji(process.env.KVIK_REACTION || "");
 const KVIK_CRON = process.env.KVIK_CRON || null;
-const KVIK_TITLE = process.env.KVIK_TITLE || "Kvík of the week";
+const KVIK_TITLE =
+  process.env.KVIK_TITLE || "<:Kuzel:1289601483398189056> Kvík of the week";
 
 const NEGATIVE_REACTIONS = parseEmojiList(process.env.NEGATIVE_REACTIONS || "");
 const IGNORED_REACTIONS = parseEmojiList(process.env.IGNORED_REACTIONS || "");
@@ -233,11 +235,12 @@ async function postWeeklyLeaderboard() {
   const summaryEmbed = new EmbedBuilder()
     .setTitle(SUMMARY_TITLE)
     .setDescription(summaryDescription)
-    .setColor(0x5865f2)
-    .setTimestamp(new Date());
+    .setColor(0x00c2ff)
+    .setTimestamp(new Date())
+    .setFooter({ text: "GGs only — full stats in thread" });
 
   summaryEmbed.addFields({
-    name: "Best Author",
+    name: "🥇 Best Author",
     value: bestAuthor
       ? `<@${bestAuthor.authorId}> — ${bestAuthor.score}`
       : "No data",
@@ -245,7 +248,7 @@ async function postWeeklyLeaderboard() {
   });
 
   summaryEmbed.addFields({
-    name: "Worst Author",
+    name: "💀 Worst Author",
     value: worstAuthor
       ? `<@${worstAuthor.authorId}> — ${worstAuthor.score}`
       : "No data",
@@ -253,7 +256,7 @@ async function postWeeklyLeaderboard() {
   });
 
   summaryEmbed.addFields({
-    name: "Best Post",
+    name: "🌟 Best Post",
     value: bestPost
       ? `${bestPost.content || "No message content available."}
 ${summarizeReactions(bestPost.reactions)}
@@ -262,7 +265,7 @@ ${summarizeReactions(bestPost.reactions)}
   });
 
   summaryEmbed.addFields({
-    name: "Worst Post",
+    name: "💥 Worst Post",
     value: worstPost
       ? `${worstPost.content || "No message content available."}
 ${summarizeReactions(worstPost.reactions)}
@@ -286,10 +289,14 @@ ${summarizeReactions(worstPost.reactions)}
   });
 
   await sendAuthorLeaderboard(thread, authorScores);
-  await sendPostLeaderboard(thread, `Top ${LEADERBOARD_LIMIT} Posts`, topPosts);
   await sendPostLeaderboard(
     thread,
-    `Worst ${WORST_POST_LIMIT} Posts`,
+    `🔥 Top ${LEADERBOARD_LIMIT} Posts`,
+    topPosts,
+  );
+  await sendPostLeaderboard(
+    thread,
+    `💀 Worst ${WORST_POST_LIMIT} Posts`,
     worstPosts,
   );
 }
@@ -330,7 +337,7 @@ async function sendAuthorLeaderboard(channel, authorScores) {
   const lines = authorScores.map(
     (entry, index) => `#${index + 1} • <@${entry.authorId}> — ${entry.score}`,
   );
-  await sendChunkedEmbeds(channel, "Full Author Leaderboard", lines);
+  await sendChunkedEmbeds(channel, "🏅 Personal Leaderboard", lines);
 }
 
 async function sendPostLeaderboard(channel, title, entries) {
@@ -357,7 +364,10 @@ async function sendPostLeaderboard(channel, title, entries) {
 async function sendChunkedEmbeds(channel, title, lines) {
   const chunks = chunkLines(lines, 3800);
   const embeds = chunks.map((chunk, index) => {
-    const embed = new EmbedBuilder().setDescription(chunk).setColor(0x5865f2);
+    const embed = new EmbedBuilder()
+      .setDescription(chunk)
+      .setColor(0x9b59b6)
+      .setFooter({ text: "Leaderboard vibes" });
     if (index === 0) embed.setTitle(title);
     return embed;
   });
@@ -375,8 +385,9 @@ async function sendFieldEmbeds(channel, title, fields) {
   for (let i = 0; i < chunks.length; i += 1) {
     const embed = new EmbedBuilder()
       .setTitle(i === 0 ? title : `${title} (cont.)`)
-      .setColor(0x5865f2)
-      .addFields(chunks[i]);
+      .setColor(0x2ecc71)
+      .addFields(chunks[i])
+      .setFooter({ text: "Clip-worthy plays inside" });
 
     await channel.send({
       embeds: [embed],
