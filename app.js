@@ -334,7 +334,7 @@ async function sendAuthorLeaderboard(channel, authorScores) {
   const lines = authorScores.map(
     (entry, index) => `#${index + 1} • <@${entry.authorId}> — ${entry.score}`,
   );
-  await sendChunkedLines(channel, "Full Author Leaderboard", lines);
+  await sendChunkedEmbeds(channel, "Full Author Leaderboard", lines);
 }
 
 async function sendPostLeaderboard(channel, title, entries) {
@@ -346,21 +346,44 @@ async function sendPostLeaderboard(channel, title, entries) {
     return;
   }
 
-  const lines = entries.map((entry, index) => {
+  const fields = entries.map((entry, index) => {
     const breakdown = summarizeReactions(entry.reactions);
     const content = entry.content || "No message content available.";
-    return `#${index + 1} • Score ${entry.score}\n${content}\n${breakdown}\n${entry.jumpUrl}`;
+    return {
+      name: `#${index + 1} • Score ${entry.score}`,
+      value: `${content}\n${breakdown}\n${entry.jumpUrl}`,
+    };
   });
 
-  await sendChunkedLines(channel, title, lines);
+  await sendFieldEmbeds(channel, title, fields);
 }
 
-async function sendChunkedLines(channel, title, lines) {
-  const chunks = chunkLines(lines, 1800);
-  for (let i = 0; i < chunks.length; i += 1) {
-    const header = i === 0 ? `**${title}**\n` : "";
+async function sendChunkedEmbeds(channel, title, lines) {
+  const chunks = chunkLines(lines, 3800);
+  const embeds = chunks.map((chunk, index) => {
+    const embed = new EmbedBuilder().setDescription(chunk).setColor(0x5865f2);
+    if (index === 0) embed.setTitle(title);
+    return embed;
+  });
+
+  for (const embed of embeds) {
     await channel.send({
-      content: `${header}${chunks[i]}`,
+      embeds: [embed],
+      allowedMentions: ALLOWED_MENTIONS,
+    });
+  }
+}
+
+async function sendFieldEmbeds(channel, title, fields) {
+  const chunks = chunkFields(fields, 20);
+  for (let i = 0; i < chunks.length; i += 1) {
+    const embed = new EmbedBuilder()
+      .setTitle(i === 0 ? title : `${title} (cont.)`)
+      .setColor(0x5865f2)
+      .addFields(chunks[i]);
+
+    await channel.send({
+      embeds: [embed],
       allowedMentions: ALLOWED_MENTIONS,
     });
   }
@@ -381,6 +404,14 @@ function chunkLines(lines, maxLength) {
   });
 
   if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
+function chunkFields(fields, chunkSize) {
+  const chunks = [];
+  for (let i = 0; i < fields.length; i += chunkSize) {
+    chunks.push(fields.slice(i, i + chunkSize));
+  }
   return chunks;
 }
 

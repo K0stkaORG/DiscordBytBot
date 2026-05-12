@@ -1,3 +1,5 @@
+import { EmbedBuilder } from "discord.js";
+
 export function parseKvikEmoji(rawValue) {
   if (!rawValue) return null;
   const trimmed = rawValue.trim();
@@ -63,27 +65,28 @@ export async function postKvikDigest({
     return;
   }
 
-  await summaryChannel.send({
-    content: `**${title}**`,
-    allowedMentions,
-  });
-
   const lines = entries.map((entry, index) => {
     const content = entry.content || "No message content available.";
     const author = entry.authorId ? `<@${entry.authorId}>` : "Unknown author";
     return `#${index + 1} • ${author}\n${content}\n${entry.jumpUrl}`;
   });
 
-  await sendChunkedLines(summaryChannel, allowedMentions, lines);
+  await sendChunkedEmbeds(summaryChannel, allowedMentions, title, lines);
 
   data.kvik.messages = {};
 }
 
-async function sendChunkedLines(channel, allowedMentions, lines) {
-  const chunks = chunkLines(lines, 1800);
-  for (const chunk of chunks) {
+async function sendChunkedEmbeds(channel, allowedMentions, title, lines) {
+  const chunks = chunkLines(lines, 3800);
+  for (let i = 0; i < chunks.length; i += 1) {
+    const embed = new EmbedBuilder()
+      .setDescription(chunks[i])
+      .setColor(0x5865f2);
+
+    if (i === 0) embed.setTitle(title);
+
     await channel.send({
-      content: chunk,
+      embeds: [embed],
       allowedMentions,
     });
   }
