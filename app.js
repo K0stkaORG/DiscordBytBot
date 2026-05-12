@@ -258,6 +258,7 @@ async function postWeeklyLeaderboard() {
     name: "🌟 Best Post",
     value: bestPost
       ? `${bestPost.content || "No message content available."}
+${bestPost.authorId ? `<@${bestPost.authorId}>` : ""}
 ${summarizeReactions(bestPost.reactions)}
 [Jump to message](${bestPost.jumpUrl})`
       : "No data",
@@ -267,6 +268,7 @@ ${summarizeReactions(bestPost.reactions)}
     name: "💥 Worst Post",
     value: worstPost
       ? `${worstPost.content || "No message content available."}
+${worstPost.authorId ? `<@${worstPost.authorId}>` : ""}
 ${summarizeReactions(worstPost.reactions)}
 [Jump to message](${worstPost.jumpUrl})`
       : "No data",
@@ -301,7 +303,8 @@ function summarizeReactions(reactions) {
   );
   const positiveCount = Math.max(0, totalCount - negativeCount);
   const finalScore = positiveCount - negativeCount;
-  return `<:up:1503802122162929694> ${positiveCount} / <:down:1503802156556488914> ${negativeCount} / <:equals:1503802180736385116> **${finalScore}**`;
+  // DO NOT CHANGE THIS LINE!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  return `<:up:1503802122162929694> ${positiveCount} / <:down:1503802156556488914> ${negativeCount} <:equals:1503802180736385116> **${finalScore}**`;
 }
 
 function aggregateAuthorScores(entries) {
@@ -371,8 +374,8 @@ async function sendChunkedEmbeds(channel, title, lines, color) {
 async function sendPostEmbeds(channel, entries, color, listType) {
   const isTopList = listType === "top";
   const isWorstList = listType === "worst";
-  const topLabels = ["Bestest", "Bester", "Best"];
-  const worstLabels = ["Worstest", "Worster", "Worst"];
+  const topLabels = ["🔥 Bestest", "🔥 Bester", "🔥 Best"];
+  const worstLabels = ["💀 Worstest", "💀 Worster", "💀 Worst"];
 
   for (let i = 0; i < entries.length; i += 1) {
     const { entry, rank } = entries[i];
@@ -380,22 +383,28 @@ async function sendPostEmbeds(channel, entries, color, listType) {
     const content = entry.content || "";
 
     let labelPrefix = `#${rank}`;
+    let authorTag = entry.authorId ? `<@${entry.authorId}>` : "";
+
     if (i < 3 && isTopList) {
-      const authorTag = entry.authorId ? ` • <@${entry.authorId}>` : "";
-      labelPrefix = `${topLabels[i]}${authorTag}`;
+      labelPrefix = topLabels[i];
     } else if (i < 3 && isWorstList) {
-      const authorTag = entry.authorId ? ` • <@${entry.authorId}>` : "";
-      labelPrefix = `${worstLabels[i]}${authorTag}`;
+      labelPrefix = worstLabels[i];
     }
 
-    const descriptionParts = [content, breakdown, entry.jumpUrl].filter(
-      (part) => part && part.trim().length > 0,
-    );
+    const headerLine = authorTag
+      ? `${labelPrefix} • ${authorTag}`
+      : labelPrefix;
+
+    const descriptionParts = [
+      headerLine,
+      content,
+      breakdown,
+      entry.jumpUrl,
+    ].filter((part) => part && part.trim().length > 0);
 
     const embed = new EmbedBuilder()
       .setColor(color)
-      .setDescription(descriptionParts.join("\n"))
-      .setAuthor({ name: labelPrefix });
+      .setDescription(descriptionParts.join("\n"));
 
     if (entry.imageUrl) {
       embed.setImage(entry.imageUrl);
