@@ -172,6 +172,7 @@ function ensureMessageEntry(message) {
       jumpUrl: message.url,
       content: summarizeContent(message.content),
       imageUrl: extractImageUrl(message),
+      attachmentLabel: extractAttachmentLabel(message),
       score: 0,
       reactions: {},
       userReactions: {},
@@ -185,6 +186,10 @@ function ensureMessageEntry(message) {
   if (!entry.imageUrl) {
     const imageUrl = extractImageUrl(message);
     if (imageUrl) entry.imageUrl = imageUrl;
+  }
+  if (!entry.attachmentLabel) {
+    const attachmentLabel = extractAttachmentLabel(message);
+    if (attachmentLabel) entry.attachmentLabel = attachmentLabel;
   }
 
   return entry;
@@ -257,7 +262,7 @@ async function postWeeklyLeaderboard() {
   summaryEmbed.addFields({
     name: "🌟 Best Post",
     value: bestPost
-      ? `${bestPost.content || "No message content available."}
+      ? `${formatSummaryContent(bestPost)}
 ${bestPost.authorId ? `<@${bestPost.authorId}>` : ""}
 ${summarizeReactions(bestPost.reactions)}
 [Jump to message](${bestPost.jumpUrl})`
@@ -267,7 +272,7 @@ ${summarizeReactions(bestPost.reactions)}
   summaryEmbed.addFields({
     name: "💥 Worst Post",
     value: worstPost
-      ? `${worstPost.content || "No message content available."}
+      ? `${formatSummaryContent(worstPost)}
 ${worstPost.authorId ? `<@${worstPost.authorId}>` : ""}
 ${summarizeReactions(worstPost.reactions)}
 [Jump to message](${worstPost.jumpUrl})`
@@ -292,6 +297,9 @@ ${summarizeReactions(worstPost.reactions)}
   await sendAuthorLeaderboard(thread, authorScores);
   await sendPostLeaderboard(thread, topPosts, "top");
   await sendPostLeaderboard(thread, worstPosts, "worst");
+
+  data.messages = {};
+  await persistData();
 }
 
 function summarizeReactions(reactions) {
@@ -380,7 +388,7 @@ async function sendPostEmbeds(channel, entries, color, listType) {
   for (let i = 0; i < entries.length; i += 1) {
     const { entry, rank } = entries[i];
     const breakdown = summarizeReactions(entry.reactions);
-    const content = entry.content || "";
+    const content = formatThreadContent(entry);
 
     let labelPrefix = `#${rank}`;
     let authorTag = entry.authorId ? `<@${entry.authorId}>` : "";
@@ -554,11 +562,41 @@ function isImageAttachment(attachment) {
   return /\.(png|jpe?g|gif|webp|bmp|tiff)$/i.test(name);
 }
 
+function extractAttachmentLabel(message) {
+  if (!message?.attachments || message.attachments.size === 0) return null;
+  const first = message.attachments.first();
+  if (!first) return null;
+
+  if (isImageAttachment(first)) return "Image";
+  if (first.contentType?.startsWith("video/")) return "Video";
+  if (first.contentType?.startsWith("audio/")) return "Audio";
+
+  const name = first.name || "";
+  const extMatch = name.match(/\.([a-z0-9]+)$/i);
+  if (extMatch) return extMatch[1].toUpperCase();
+
+  return "Attachment";
+}
+
 function summarizeContent(content) {
   if (!content) return "";
   const clean = content.replace(/\s+/g, " ").trim();
   if (clean.length <= 140) return clean;
   return `${clean.slice(0, 137)}...`;
+}
+
+function formatSummaryContent(entry) {
+  if (entry.content) return entry.content;
+  if (entry.imageUrl) return "[Image]";
+  if (entry.attachmentLabel) return `[${entry.attachmentLabel}]`;
+  return "[Attachment]";
+}
+
+function formatThreadContent(entry) {
+  if (entry.content) return entry.content;
+  if (entry.imageUrl) return "";
+  if (entry.attachmentLabel) return `[${entry.attachmentLabel}]`;
+  return "[Attachment]";
 }
 
 async function loadData() {
