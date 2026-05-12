@@ -5,5 +5,7 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    ports:
+      - "6666:3000"
     volumes:
       - /home/byttorrent/docker/bytbot:/app/data

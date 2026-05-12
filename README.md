@@ -33,6 +33,7 @@ Copy `.env.example` to `.env` and fill in values:
 - `NEGATIVE_REACTIONS` (comma-separated)
 - `LEADERBOARD_CRON` (optional, default `0 9 * * 1`)
 - `LEADERBOARD_LIMIT` (optional, default `10`)
+- `MESSAGE_CONTENT_INTENT` (optional, set to `true` only if you enabled the Message Content Intent)
 
 Reaction values accept unicode or custom emojis. Custom emojis can be provided as either `name:id` or the full `<:name:id>` format.
 

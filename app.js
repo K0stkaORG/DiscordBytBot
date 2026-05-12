@@ -28,13 +28,16 @@ if (POSITIVE_REACTIONS.size === 0 && NEGATIVE_REACTIONS.size === 0) {
   );
 }
 
+const USE_MESSAGE_CONTENT_INTENT =
+  String(process.env.MESSAGE_CONTENT_INTENT || "").toLowerCase() === "true";
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildMessageReactions,
-    GatewayIntentBits.MessageContent,
-  ],
+    USE_MESSAGE_CONTENT_INTENT ? GatewayIntentBits.MessageContent : null,
+  ].filter(Boolean),
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
