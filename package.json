@@ -19,8 +19,5 @@
     "discord.js": "14.14.1",
     "dotenv": "^16.0.3",
     "node-cron": "3.0.3"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.0"
   }
 }
