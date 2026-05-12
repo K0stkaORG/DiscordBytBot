@@ -380,15 +380,32 @@ async function sendChunkedEmbeds(channel, title, lines, color) {
 }
 
 async function sendPostEmbeds(channel, title, entries, color) {
+  const isTopList = title.startsWith("🔥");
+  const isWorstList = title.startsWith("💀");
+  const topLabels = ["🔥 Bestest", "🔥 Bester", "🔥 Best"];
+  const worstLabels = ["💀 Worstest", "💀 Worster", "💀 Worst"];
+
   for (let i = 0; i < entries.length; i += 1) {
     const { entry, rank } = entries[i];
     const breakdown = summarizeReactions(entry.reactions);
-    const content = entry.content || "No message content available.";
+    const hasContent = Boolean(entry.content);
+    const content = hasContent ? entry.content : "";
+
+    let labelPrefix = `#${rank}`;
+    if (i < 3 && isTopList) {
+      labelPrefix = topLabels[i];
+    } else if (i < 3 && isWorstList) {
+      labelPrefix = worstLabels[i];
+    }
+
+    const descriptionParts = [content, breakdown, entry.jumpUrl].filter(
+      (part) => part && part.trim().length > 0,
+    );
 
     const embed = new EmbedBuilder()
       .setColor(color)
-      .setDescription(`${content}\n${breakdown}\n${entry.jumpUrl}`)
-      .setAuthor({ name: `#${rank} • Score ${entry.score}` });
+      .setDescription(descriptionParts.join("\n"))
+      .setAuthor({ name: `${labelPrefix} • Score ${entry.score}` });
 
     if (i === 0) {
       embed.setTitle(title);
