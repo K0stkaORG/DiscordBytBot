@@ -35,7 +35,7 @@ const THREAD_TITLE =
   process.env.THREAD_TITLE || "🎮 Weekly Leaderboard Details";
 const THREAD_AUTO_ARCHIVE_MINUTES = parseArchiveDuration(
   process.env.THREAD_AUTO_ARCHIVE_MINUTES,
-  10080,
+  60,
 );
 const DATA_PATH = path.join("data", "leaderboard.json");
 const ALLOWED_MENTIONS = { parse: [] };
